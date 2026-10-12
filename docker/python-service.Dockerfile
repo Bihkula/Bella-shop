@@ -15,6 +15,9 @@ RUN pip install /src/shopcommon -r /src/requirements.txt
 
 FROM python:${PYTHON_VERSION}-slim
 ARG SERVICE
+# Apply Debian security updates published since the base image was built.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends \
+    && rm -rf /var/lib/apt/lists/*
 ENV PATH=/venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \

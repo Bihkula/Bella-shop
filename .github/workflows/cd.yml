@@ -64,7 +64,7 @@ jobs:
       contents: read
       packages: write   # push to ghcr.io with GITHUB_TOKEN
     strategy:
-      fail-fast: true
+      fail-fast: false  # keep building the other images if one fails
       matrix:
         service: ${{ fromJSON(needs.changes.outputs.services) }}
     env:

@@ -54,7 +54,7 @@ def test_me_requires_token(client):
 
 
 def test_admin_seeded(client):
-    r = _login(client, email="admin@shop.test", password="admin-pass-123")
+    r = _login(client, email="admin@example.com", password="admin-pass-123")
     token = r.json()["access_token"]
     me = client.get("/me", headers={"Authorization": f"Bearer {token}"})
     assert me.json()["role"] == "admin"

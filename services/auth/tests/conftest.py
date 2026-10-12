@@ -6,7 +6,7 @@ os.environ.update(
     DATABASE_URL=f"sqlite:///{_tmp}/test.db",
     JWT_SECRET="test-secret-at-least-32-bytes-long-0123",
     INTERNAL_TOKEN="test-internal",
-    ADMIN_EMAIL="admin@shop.test",
+    ADMIN_EMAIL="admin@example.com",
     ADMIN_PASSWORD="admin-pass-123",
     PASSWORD_HASH_ITERATIONS="1000",
 )
