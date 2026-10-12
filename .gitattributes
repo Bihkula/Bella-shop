@@ -1,0 +1,5 @@
+# Keep Unix line endings everywhere so bash scripts and YAML behave the same
+# on Windows (Git Bash), macOS, Linux and in CI.
+* text=auto eol=lf
+*.png binary
+*.zip binary

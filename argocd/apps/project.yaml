@@ -1,0 +1,24 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: shop
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  description: Online shop workloads
+  sourceRepos:
+    - https://github.com/Bihkula/Bella-shop.git
+  destinations:
+    - { server: https://kubernetes.default.svc, namespace: shop-dev }
+    - { server: https://kubernetes.default.svc, namespace: shop-prod }
+  clusterResourceWhitelist:
+    - { group: "", kind: Namespace }
+  namespaceResourceBlacklist:
+    - { group: "", kind: ResourceQuota }
+  roles:
+    - name: deployer
+      description: Can sync shop apps (e.g. from CI)
+      policies:
+        - p, proj:shop:deployer, applications, sync, shop/*, allow
+        - p, proj:shop:deployer, applications, get, shop/*, allow

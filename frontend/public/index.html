@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fieldkit — Goods for the outdoors</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="bar">
+    <a class="brand" href="#/">Fieldkit<span>.</span></a>
+    <nav>
+      <a href="#/">Shop</a>
+      <a href="#/orders" data-auth>Orders</a>
+      <button id="cartBtn" class="ghost">Basket <b id="cartCount">0</b></button>
+      <button id="authBtn">Sign in</button>
+    </nav>
+  </header>
+
+  <main id="view"></main>
+
+  <aside id="cart" class="drawer" aria-hidden="true">
+    <div class="drawer-head"><h2>Basket</h2><button class="ghost" data-close>✕</button></div>
+    <ul id="cartLines"></ul>
+    <div class="drawer-foot">
+      <div class="total"><span>Total</span><b id="cartTotal">£0.00</b></div>
+      <button id="checkoutBtn" class="primary wide">Checkout</button>
+    </div>
+  </aside>
+
+  <dialog id="authDlg">
+    <form id="authForm" method="dialog">
+      <h2 id="authTitle">Sign in</h2>
+      <label>Email <input name="email" type="email" required autocomplete="email"></label>
+      <label>Password <input name="password" type="password" required minlength="8" autocomplete="current-password"></label>
+      <p class="err" id="authErr"></p>
+      <button class="primary wide" value="submit">Continue</button>
+      <p class="muted small">
+        <a href="#" id="authToggle">New here? Create an account</a>
+      </p>
+    </form>
+  </dialog>
+
+  <dialog id="payDlg">
+    <form id="payForm" method="dialog">
+      <h2>Payment</h2>
+      <p class="muted" id="payAmount"></p>
+      <div id="mockFields">
+        <label>Card number <input name="card" inputmode="numeric" autocomplete="cc-number" value="4242 4242 4242 4242"></label>
+        <p class="muted small">Test gateway. Try <code>4000 0000 0000 0002</code> for a decline.</p>
+      </div>
+      <div id="stripeFields" hidden><div id="payment-element"></div></div>
+      <p class="err" id="payErr"></p>
+      <button class="primary wide" id="payBtn">Pay</button>
+    </form>
+  </dialog>
+
+  <div id="toast" role="status"></div>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

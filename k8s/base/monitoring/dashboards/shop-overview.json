@@ -1,0 +1,93 @@
+{
+  "title": "Shop — Overview",
+  "uid": "shop-overview",
+  "tags": ["shop"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      { "name": "datasource", "type": "datasource", "query": "prometheus", "label": "Data source" },
+      {
+        "name": "namespace", "type": "query", "label": "Environment",
+        "datasource": { "type": "prometheus", "uid": "${datasource}" },
+        "query": "label_values(http_requests_total, namespace)",
+        "refresh": 2, "current": {}
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Business", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 } },
+    {
+      "type": "stat", "title": "Revenue (range)",
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "currencyGBP", "decimals": 2 } },
+      "targets": [{ "expr": "sum(increase(shop_revenue_pence_total{namespace=\"$namespace\"}[$__range])) / 100", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Orders paid (range)",
+      "gridPos": { "h": 5, "w": 6, "x": 6, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "sum(increase(shop_orders_total{namespace=\"$namespace\",event=\"paid\"}[$__range]))", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Checkout conversion",
+      "description": "Paid orders / orders created",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1 } },
+      "targets": [{ "expr": "sum(increase(shop_orders_total{namespace=\"$namespace\",event=\"paid\"}[$__range])) / clamp_min(sum(increase(shop_orders_total{namespace=\"$namespace\",event=\"created\"}[$__range])), 1)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Payment success rate",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 1 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1,
+        "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "orange", "value": 0.8 }, { "color": "green", "value": 0.95 } ] } } },
+      "targets": [{ "expr": "sum(increase(shop_payments_total{namespace=\"$namespace\",status=\"succeeded\"}[$__range])) / clamp_min(sum(increase(shop_payments_total{namespace=\"$namespace\",status=~\"succeeded|failed\"}[$__range])), 1)", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "Order events / min",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "sum by (event) (rate(shop_orders_total{namespace=\"$namespace\"}[5m])) * 60", "legendFormat": "{{event}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "Logins / min",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "expr": "sum by (result) (rate(shop_auth_logins_total{namespace=\"$namespace\"}[5m])) * 60", "legendFormat": "{{result}}", "refId": "A" }]
+    },
+    { "type": "row", "title": "Services (RED)", "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 } },
+    {
+      "type": "timeseries", "title": "Requests / s",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [{ "expr": "sum by (service) (rate(http_requests_total{namespace=\"$namespace\"}[5m]))", "legendFormat": "{{service}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "5xx error ratio",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [{ "expr": "sum by (service) (rate(http_requests_total{namespace=\"$namespace\",status=~\"5..\"}[5m])) / clamp_min(sum by (service) (rate(http_requests_total{namespace=\"$namespace\"}[5m])), 1e-9)", "legendFormat": "{{service}}", "refId": "A" }]
+    },
+    {
+      "type": "timeseries", "title": "p95 latency",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 15 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "expr": "histogram_quantile(0.95, sum by (service, le) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[5m])))", "legendFormat": "{{service}}", "refId": "A" }]
+    },
+    {
+      "type": "table", "title": "Slowest routes (p95, 1h)",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 23 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [{ "expr": "topk(10, histogram_quantile(0.95, sum by (service, method, route, le) (rate(http_request_duration_seconds_bucket{namespace=\"$namespace\"}[1h]))))", "format": "table", "instant": true, "refId": "A" }]
+    }
+  ]
+}

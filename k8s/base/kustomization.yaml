@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: shop
+    includeSelectors: false
+    includeTemplates: true
+
+resources:
+  - config.yaml
+  - db-init-job.yaml
+  - services/auth.yaml
+  - services/products.yaml
+  - services/orders.yaml
+  - services/payments.yaml
+  - services/frontend.yaml
+  - ingress.yaml
+  - networkpolicy.yaml
+  - monitoring/servicemonitor.yaml
+  - monitoring/prometheusrule.yaml
+
+configMapGenerator:
+  - name: shop-grafana-dashboards
+    files:
+      - monitoring/dashboards/shop-overview.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
+      annotations:
+        grafana_folder: Shop
+
+# Argo CD sync order: namespace (-3) → Postgres (-1, dev)
+# → db-init Job (0) → workloads (1). Services never start before their DB exists.
+patches:
+  - target: { kind: Deployment }
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          argocd.argoproj.io/sync-wave: "1"
+
+# Image names here are logical; overlays map them to ghcr.io images + tags.
+images:
+  - name: shop-auth
+  - name: shop-products
+  - name: shop-orders
+  - name: shop-payments
+  - name: shop-frontend

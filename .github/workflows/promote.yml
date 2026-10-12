@@ -1,0 +1,59 @@
+# Copies the image tags currently running in dev into the prod overlay and
+# opens a pull request. Merging the PR is the production deploy (Argo CD syncs).
+name: Promote dev to prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: Comma-separated services to promote (blank = all)
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install kustomize
+        run: |
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.7.1/kustomize_v5.7.1_linux_amd64.tar.gz" | tar xz -C /usr/local/bin
+      - name: Copy tags
+        id: copy
+        env:
+          WANTED: ${{ inputs.services }}
+        run: |
+          summary=""
+          count=$(yq '.images | length' k8s/overlays/dev/kustomization.yaml)
+          for i in $(seq 0 $((count - 1))); do
+            name=$(yq ".images[$i].name" k8s/overlays/dev/kustomization.yaml)
+            svc=${name#shop-}
+            if [ -n "$WANTED" ] && ! echo ",$WANTED," | grep -q ",$svc,"; then continue; fi
+            image=$(yq ".images[$i].newName" k8s/overlays/dev/kustomization.yaml)
+            tag=$(yq ".images[$i].newTag" k8s/overlays/dev/kustomization.yaml)
+            old=$(yq ".images[] | select(.name == \"$name\") | .newTag" k8s/overlays/prod/kustomization.yaml)
+            (cd k8s/overlays/prod && kustomize edit set image "$name=$image:$tag")
+            [ "$old" != "$tag" ] && summary="$summary- **$svc**: \`$old\` → \`$tag\`"$'\n'
+          done
+          {
+            echo "summary<<EOF"
+            echo "${summary:-No changes}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+      - uses: peter-evans/create-pull-request@v7
+        with:
+          branch: promote/prod
+          delete-branch: true
+          commit-message: "deploy(prod): promote from dev"
+          title: "Promote to production"
+          labels: deploy, prod
+          body: |
+            Promotes the images currently running in **dev** to **prod**.
+
+            ${{ steps.copy.outputs.summary }}
+
+            Merging this PR deploys to `shop-prod` via Argo CD.

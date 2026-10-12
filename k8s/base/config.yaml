@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shop-config
+data:
+  APP_ENV: development
+  LOG_LEVEL: INFO
+  JWT_ISSUER: shop-auth
+  JWT_AUDIENCE: shop
+  JWT_TTL_SECONDS: "3600"
+  PRODUCTS_URL: http://products:8000
+  ORDERS_URL: http://orders:8000
+  PAYMENTS_URL: http://payments:8000
+  PAYMENT_PROVIDER: mock
+  # In-cluster Postgres for dev; prod overlay points this at RDS.
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_USER: shop
+  DB_SSLMODE: disable

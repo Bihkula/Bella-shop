@@ -1,0 +1,65 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: shop-alerts
+  annotations:
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+spec:
+  groups:
+    - name: shop.slo
+      rules:
+        - alert: ShopServiceDown
+          expr: up{job=~"auth|products|orders|payments"} == 0
+          for: 2m
+          labels: { severity: critical }
+          annotations:
+            summary: "{{ $labels.job }} is down in {{ $labels.namespace }}"
+            description: "Prometheus has not been able to scrape {{ $labels.pod }} for 2 minutes."
+
+        - alert: ShopHighErrorRate
+          expr: |
+            sum by (namespace, service) (rate(http_requests_total{status=~"5.."}[5m]))
+              /
+            sum by (namespace, service) (rate(http_requests_total[5m])) > 0.05
+          for: 5m
+          labels: { severity: critical }
+          annotations:
+            summary: "{{ $labels.service }} 5xx rate above 5%"
+            description: "Current error ratio {{ $value | humanizePercentage }}."
+
+        - alert: ShopHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum by (namespace, service, le) (rate(http_request_duration_seconds_bucket[5m]))
+            ) > 1
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "{{ $labels.service }} p95 latency above 1s"
+
+    - name: shop.business
+      rules:
+        - alert: ShopPaymentFailureSpike
+          expr: |
+            sum by (namespace) (rate(shop_payments_total{status="failed"}[15m]))
+              /
+            sum by (namespace) (rate(shop_payments_total{status=~"succeeded|failed"}[15m])) > 0.3
+          for: 10m
+          labels: { severity: warning }
+          annotations:
+            summary: "More than 30% of payments are failing"
+            description: "Check the payment provider status page and recent deploys."
+
+        - alert: ShopOrderCallbackFailing
+          expr: increase(shop_payment_notify_failures_total[10m]) > 0
+          labels: { severity: critical }
+          annotations:
+            summary: "Payments could not update order status"
+            description: "Customers may have paid for orders still marked unpaid. Investigate the orders service."
+
+        - alert: ShopLoginBruteForce
+          expr: sum by (namespace) (rate(shop_auth_logins_total{result=~"failure|throttled"}[5m])) > 2
+          for: 5m
+          labels: { severity: warning }
+          annotations:
+            summary: "Unusual rate of failed logins"

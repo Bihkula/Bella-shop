@@ -1,0 +1,42 @@
+# Enforced on EKS when the VPC CNI network policy agent is enabled
+# (enableNetworkPolicy: "true" on the vpc-cni add-on).
+
+# Default: nothing in the namespace accepts traffic unless allowed below.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# The gateway takes traffic from the ALB (target-type ip sends it straight to pods).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-from-alb
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: frontend }
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - { port: 8080, protocol: TCP }
+---
+# APIs accept traffic from the gateway, from each other, and Prometheus scrapes.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/component: api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/part-of: shop }
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+      ports:
+        - { port: 8000, protocol: TCP }

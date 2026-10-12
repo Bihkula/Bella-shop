@@ -1,0 +1,1 @@
+# shopcommon (libs/shopcommon) provides all runtime dependencies

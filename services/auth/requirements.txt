@@ -1,0 +1,1 @@
+# shopcommon (libs/shopcommon) brings fastapi, sqlalchemy, pyjwt, prometheus-client, httpx

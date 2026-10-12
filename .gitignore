@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+*.db
+.env
+*.egg-info/
+build/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+
+# Never commit a downloaded copy of the passwords file
+secrets.json
+shop-secrets.json

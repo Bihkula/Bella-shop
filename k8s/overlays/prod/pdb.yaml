@@ -1,0 +1,39 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: auth } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: products
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: products } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: orders
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: orders } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: payments
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: payments } }
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend
+spec:
+  minAvailable: 1
+  selector: { matchLabels: { app.kubernetes.io/name: frontend } }

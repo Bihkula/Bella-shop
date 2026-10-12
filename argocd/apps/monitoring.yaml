@@ -1,0 +1,66 @@
+# Prometheus Operator + Prometheus + Alertmanager + Grafana.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 92.3.0
+    helm:
+      valuesObject:
+        prometheus:
+          prometheusSpec:
+            # Discover ServiceMonitors / rules in every namespace, not only
+            # ones labelled with this Helm release.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            retention: 15d
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3
+                  accessModes: [ReadWriteOnce]
+                  resources: { requests: { storage: 50Gi } }
+        grafana:
+          # Admin password comes from the grafana-admin Secret that Terraform
+          # creates from s3://<state bucket>/secrets/shop-secrets.json.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
+          sidecar:
+            dashboards:
+              enabled: true
+              label: grafana_dashboard
+              labelValue: "1"
+              searchNamespace: ALL
+              folderAnnotation: grafana_folder
+              provider:
+                foldersFromFilesStructure: true
+          persistence:
+            enabled: true
+            storageClassName: gp3
+            size: 5Gi
+        alertmanager:
+          alertmanagerSpec:
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3
+                  accessModes: [ReadWriteOnce]
+                  resources: { requests: { storage: 5Gi } }
+          # Add a receiver (Slack, PagerDuty, email) under config.receivers.
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]

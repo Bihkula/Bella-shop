@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payments
+  labels: &labels
+    app.kubernetes.io/name: payments
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: payments
+  strategy:
+    rollingUpdate: { maxSurge: 1, maxUnavailable: 0 }
+  template:
+    metadata:
+      labels: *labels
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: payments }
+      containers:
+        - name: payments
+          image: shop-payments
+          ports:
+            - { name: http, containerPort: 8000 }
+          envFrom:
+            - configMapRef: { name: shop-config }
+          env:
+            - { name: SERVICE_NAME, value: payments }
+            - name: DB_PASSWORD
+              valueFrom: { secretKeyRef: { name: shop-secrets, key: DB_PASSWORD } }
+            - name: DATABASE_URL
+              value: postgresql+psycopg://$(DB_USER):$(DB_PASSWORD)@$(DB_HOST):$(DB_PORT)/payments?sslmode=$(DB_SSLMODE)
+            - name: JWT_SECRET
+              valueFrom: { secretKeyRef: { name: shop-secrets, key: JWT_SECRET } }
+            - name: INTERNAL_TOKEN
+              valueFrom: { secretKeyRef: { name: shop-secrets, key: INTERNAL_TOKEN } }
+            - name: STRIPE_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: shop-secrets, key: STRIPE_SECRET_KEY, optional: true } }
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom: { secretKeyRef: { name: shop-secrets, key: STRIPE_WEBHOOK_SECRET, optional: true } }
+            - name: STRIPE_PUBLISHABLE_KEY
+              valueFrom: { secretKeyRef: { name: shop-secrets, key: STRIPE_PUBLISHABLE_KEY, optional: true } }
+          startupProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 3
+            failureThreshold: 20
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: tmp, emptyDir: {} }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payments
+  labels:
+    app.kubernetes.io/name: payments
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: payments
+  ports:
+    - { name: http, port: 8000, targetPort: http }

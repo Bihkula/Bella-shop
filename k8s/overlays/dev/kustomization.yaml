@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: shop-dev
+
+resources:
+  - namespace.yaml
+  - ../../base
+  - postgres.yaml
+
+patches:
+  - target: { kind: Ingress, name: shop }
+    patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.name
+        value: shop-dev
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1tags
+        value: Environment=dev,Project=shop
+
+# Images live in GitHub Container Registry. The CD workflow rewrites newTag on every merge to main
+# (kustomize edit set image ...). Don't edit tags by hand.
+images:
+  - name: shop-auth
+    newName: ghcr.io/bihkula/shop-auth
+    newTag: latest
+  - name: shop-products
+    newName: ghcr.io/bihkula/shop-products
+    newTag: latest
+  - name: shop-orders
+    newName: ghcr.io/bihkula/shop-orders
+    newTag: latest
+  - name: shop-payments
+    newName: ghcr.io/bihkula/shop-payments
+    newTag: latest
+  - name: shop-frontend
+    newName: ghcr.io/bihkula/shop-frontend
+    newTag: latest

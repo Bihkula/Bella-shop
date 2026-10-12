@@ -1,0 +1,82 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: shop-prod
+
+resources:
+  - namespace.yaml
+  - ../../base
+  - hpa.yaml
+  - pdb.yaml
+
+patches:
+  # Production config: real gateway, RDS over TLS.
+  - target: { kind: ConfigMap, name: shop-config }
+    patch: |-
+      - op: replace
+        path: /data/APP_ENV
+        value: production
+      - op: replace
+        path: /data/PAYMENT_PROVIDER
+        value: stripe
+      - op: replace
+        path: /data/DB_HOST
+        value: RDS_ENDPOINT
+      - op: replace
+        path: /data/DB_SSLMODE
+        value: require
+
+  # Two replicas minimum everywhere (HPA scales the APIs further).
+  - target: { kind: Deployment }
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  # HTTPS on the ALB with an ACM certificate, HTTP redirected.
+  - target: { kind: Ingress, name: shop }
+    patch: |-
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1listen-ports
+        value: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1ssl-redirect
+        value: "443"
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1certificate-arn
+        value: ACM_CERTIFICATE_ARN
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1group.name
+        value: shop-prod
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1tags
+        value: Environment=prod,Project=shop
+      - op: add
+        path: /spec/rules/0/host
+        value: SHOP_DOMAIN
+
+  - target: { kind: Deployment, labelSelector: "app.kubernetes.io/component=api" }
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests: { cpu: 200m, memory: 256Mi }
+          limits: { memory: 512Mi }
+
+# Promoted from dev by .github/workflows/promote.yml (opens a PR).
+images:
+  - name: shop-auth
+    newName: ghcr.io/bihkula/shop-auth
+    newTag: latest
+  - name: shop-products
+    newName: ghcr.io/bihkula/shop-products
+    newTag: latest
+  - name: shop-orders
+    newName: ghcr.io/bihkula/shop-orders
+    newTag: latest
+  - name: shop-payments
+    newName: ghcr.io/bihkula/shop-payments
+    newTag: latest
+  - name: shop-frontend
+    newName: ghcr.io/bihkula/shop-frontend
+    newTag: latest

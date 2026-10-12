@@ -1,0 +1,25 @@
+# Cluster config installed from git. (The AWS Load Balancer Controller, Argo CD
+# and the app Secrets are created by Terraform: infra/terraform/cluster/.)
+# gp3 StorageClass (plain manifests in platform/).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-config
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-4"
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Bihkula/Bella-shop.git
+    targetRevision: main
+    path: platform
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [SkipDryRunOnMissingResource=true]
+    retry:
+      limit: 10
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }

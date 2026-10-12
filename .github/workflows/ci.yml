@@ -1,0 +1,121 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  KUSTOMIZE_VERSION: "5.7.1"
+  KUBECONFORM_VERSION: "0.7.0"
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with: { python-version: "${{ env.PYTHON_VERSION }}" }
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check . || echo "::warning::run 'ruff format' to tidy formatting"
+
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        component:
+          - libs/shopcommon
+          - services/auth
+          - services/products
+          - services/orders
+          - services/payments
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "${{ env.PYTHON_VERSION }}"
+          cache: pip
+          cache-dependency-path: |
+            libs/shopcommon/pyproject.toml
+            services/*/requirements.txt
+      - name: Install
+        run: |
+          pip install ./libs/shopcommon pytest
+          if [ -f "${{ matrix.component }}/requirements.txt" ]; then
+            pip install -r "${{ matrix.component }}/requirements.txt"
+          fi
+      - name: Test
+        working-directory: ${{ matrix.component }}
+        run: pytest -q
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install kustomize + kubeconform
+        run: |
+          curl -sSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | tar xz -C /usr/local/bin
+          curl -sSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" | tar xz -C /usr/local/bin
+      - name: Render and validate overlays
+        run: |
+          for env in dev prod; do
+            echo "::group::$env"
+            kustomize build "k8s/overlays/$env" > "/tmp/$env.yaml"
+            kubeconform -strict -summary -ignore-missing-schemas \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              "/tmp/$env.yaml"
+            echo "::endgroup::"
+          done
+      - name: Validate Argo CD + platform manifests
+        run: |
+          kubeconform -strict -summary -ignore-missing-schemas \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            argocd platform
+      - name: Grafana dashboard is valid JSON
+        run: python -m json.tool k8s/base/monitoring/dashboards/shop-overview.json > /dev/null
+
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v3
+        with: { terraform_version: "^1.10" }
+      - run: terraform fmt -check -recursive -diff infra/terraform || echo "::warning::run terraform fmt -recursive infra/terraform"
+      - name: Validate each stack
+        run: |
+          for stack in bootstrap persistent cluster; do
+            echo "::group::$stack"
+            terraform -chdir=infra/terraform/$stack init -backend=false -input=false
+            terraform -chdir=infra/terraform/$stack validate
+            echo "::endgroup::"
+          done
+
+  # On PRs, make sure every image still builds (no push).
+  docker-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [auth, products, orders, payments, frontend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.service == 'frontend' && 'frontend/Dockerfile' || 'docker/python-service.Dockerfile' }}
+          build-args: SERVICE=${{ matrix.service }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.service }}
