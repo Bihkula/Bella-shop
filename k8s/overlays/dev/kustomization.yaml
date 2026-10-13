@@ -28,7 +28,7 @@ images:
   newTag: sha-5b83b3a
 - name: shop-frontend
   newName: ghcr.io/bihkula/shop-frontend
-  newTag: sha-5b83b3a
+  newTag: sha-7269a82
 - name: shop-orders
   newName: ghcr.io/bihkula/shop-orders
   newTag: sha-5b83b3a
