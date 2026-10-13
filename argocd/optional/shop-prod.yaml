@@ -1,0 +1,30 @@
+# Parked: Argo CD only reads argocd/apps/, so this app is NOT deployed.
+# Move it back into argocd/apps/ once production has an RDS database, an ACM
+# certificate + domain, and Stripe keys (see README "Production").
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: shop-prod
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: shop
+  source:
+    repoURL: https://github.com/Bihkula/Bella-shop.git
+    targetRevision: main
+    path: k8s/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: shop-prod
+  # Prod changes only via a reviewed promotion PR; once merged Argo syncs it.
+  # selfHeal reverts any manual kubectl edits.
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    retry:
+      limit: 5
+      backoff: { duration: 10s, factor: 2, maxDuration: 3m }
+  # Let the HPA own replica counts.
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers: [/spec/replicas]

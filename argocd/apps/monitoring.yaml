@@ -28,7 +28,7 @@ spec:
                 spec:
                   storageClassName: gp3
                   accessModes: [ReadWriteOnce]
-                  resources: { requests: { storage: 50Gi } }
+                  resources: { requests: { storage: 10Gi } }
         grafana:
           # Admin password comes from the grafana-admin Secret that Terraform
           # creates from s3://<state bucket>/secrets/shop-secrets.json.

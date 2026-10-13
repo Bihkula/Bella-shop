@@ -45,7 +45,24 @@ resource "helm_release" "argocd" {
   values = [yamlencode({
     dex = { enabled = false }
     configs = {
-      cm = { "timeout.reconciliation" = "120s" }
+      cm = {
+        "timeout.reconciliation" = "120s"
+        # By default Argo CD doesn't wait for a child Application to become
+        # healthy before moving to the next sync wave. This restores that, so
+        # the StorageClass and Prometheus CRDs exist before the shop syncs.
+        "resource.customizations.health.argoproj.io_Application" = <<-LUA
+          hs = {}
+          hs.status = "Progressing"
+          hs.message = ""
+          if obj.status ~= nil and obj.status.health ~= nil then
+            hs.status = obj.status.health.status
+            if obj.status.health.message ~= nil then
+              hs.message = obj.status.health.message
+            end
+          end
+          return hs
+        LUA
+      }
     }
   })]
 

@@ -17,33 +17,5 @@ spec:
   syncPolicy:
     automated: { prune: true, selfHeal: true }
     retry:
-      limit: 5
-      backoff: { duration: 10s, factor: 2, maxDuration: 3m }
----
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: shop-prod
-  namespace: argocd
-  finalizers: [resources-finalizer.argocd.argoproj.io]
-spec:
-  project: shop
-  source:
-    repoURL: https://github.com/Bihkula/Bella-shop.git
-    targetRevision: main
-    path: k8s/overlays/prod
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: shop-prod
-  # Prod changes only via a reviewed promotion PR; once merged Argo syncs it.
-  # selfHeal reverts any manual kubectl edits.
-  syncPolicy:
-    automated: { prune: true, selfHeal: true }
-    retry:
-      limit: 5
-      backoff: { duration: 10s, factor: 2, maxDuration: 3m }
-  # Let the HPA own replica counts.
-  ignoreDifferences:
-    - group: apps
-      kind: Deployment
-      jsonPointers: [/spec/replicas]
+      limit: 10
+      backoff: { duration: 15s, factor: 2, maxDuration: 5m }

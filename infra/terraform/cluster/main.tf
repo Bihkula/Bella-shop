@@ -80,7 +80,12 @@ module "eks" {
       configuration_values = jsonencode({ enableNetworkPolicy = "true" })
     }
     eks-pod-identity-agent = { before_compute = true }
-    aws-ebs-csi-driver     = {}
+    aws-ebs-csi-driver = {
+      pod_identity_association = [{
+        role_arn        = module.ebs_csi_identity.iam_role_arn
+        service_account = "ebs-csi-controller-sa"
+      }]
+    }
     metrics-server         = {}
   }
 
@@ -118,11 +123,5 @@ module "ebs_csi_identity" {
 
   name                      = "${var.cluster_name}-ebs-csi"
   attach_aws_ebs_csi_policy = true
-  associations = {
-    this = {
-      cluster_name    = module.eks.cluster_name
-      namespace       = "kube-system"
-      service_account = "ebs-csi-controller-sa"
-    }
-  }
+  # Associated with the add-on in module "eks" above.
 }
